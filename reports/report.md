@@ -3,50 +3,14 @@
 #### Sabrina Pereira and Micah Reid
 
 
-<!-- Content
-Your project report should answer the following questions (note that some are the same as in the proposal and the update):
-
-1) What is the goal of your project; for example, what do you plan to make, and what should it do?
-
-2) What are your learning goals; that is, what do you intend to achieve by working on this project?
-
-3) What resources did you find that were useful to you.  If you found any resources you think I should add to the list on the class web page, please email them to me.
-
-4) What were you able to get done?  Include in the report whatever evidence is appropriate to demonstrate the outcome of the project.  Consider including snippets of code with explanation; do not paste in large chunks of unexplained code.  Consider including links to relevant files.  And do include output from the program(s) you wrote.
-
-5) Explain at least one design decision you made.  Were there several ways to do something?  Which did you choose and why?
-
-6) You will probably want to present a few code snippets that present the most important parts of your implementation.  You should not paste in large chunks of code or put them in the Appendix.  You can provide a link to a code file, but the report should stand alone; I should not have to read your code files to understand what you did.
-
-7) Reflect on the outcome of the project in terms of your learning goals.  Between the lower and upper bounds you identified in the proposal, where did your project end up?  Did you achieve your learning goals?
-
-Audience: Target an external audience that wants to know what you did and why.  More specifically, think about students in future versions of SoftSys who might want to work on a related project.  Also think about people who might look at your online portfolio to see what you know, what you can do, and how well you can communicate.
-
- You don't have to answer the questions above in exactly that order, but the logical flow of your report should make sense.  Do not paste the questions into your final report. -->
-
-
-
-
-
 ## Project Goals
 Our goal is to understand the mechanics of buffer overflow attacks, and common issues that would make a program susceptible to this type of security risk. Our minimum goal is to go through the provided exercises to perform buffer overflow attacks (provided by Steve). Our reach goals are to understand buffer overflow attacks enough to create our own programs that either have exploitable vulnerabilities, or use practices to prevent buffer overflow attacks.
 
 
 We chose to learn to use the CLion IDE and debugger to do this because both us wanted to learn about what debugging tools exist, what they look like, and what capabilities they afford us.
 
-<!-- ## Learning Goals
-We hope to gain experience using a debugger as this will allow us to gain more insight into how these attacks are performed, and what is actually happening in the memory. We hope to answer questions such as:
-  - How does the data get copied into the buffer?
-  - What types of programs are susceptible to this type of attack?
-  - How would one go about performing this type of attack?
-  - How do we know if our programs would be vulnerable? -->
-
 
 ## What is a Buffer Overflow Attack?
-
-<!-- A buffer overflow condition exists when a program attempts to put more data in a buffer than it can hold or when a program attempts to put data in a memory area past a buffer. In this case, a buffer is a sequential section of memory allocated to contain anything from a character string to an array of integers. Writing outside the bounds of a block of allocated memory can corrupt data, crash the program, or cause the execution of malicious code.
-
-A buffer overflow, or buffer overrun, is a common software coding mistake that an attacker could exploit to gain access to your system. To effectively mitigate buffer overflow vulnerabilities, it is important to understand what buffer overflows are, what dangers they pose to your applications, and what techniques attackers use to successfully exploit these vulnerabilities. -->
 
 First, a buffer overflow occurs when a program tries to put data into a buffer that is of insufficient size for the operation. There is a specific block of memory that is allocated to storing that data, and going outside those bounds can cause various issues. If you know information about how these buffers are stored and what type of information is around them, you can intentionally cause a buffer overflow in a vulnerable program and modify its normal behavior.
 
@@ -174,40 +138,38 @@ To do this, we must convert our address to a little endian format. This means we
 `python3 -c 'import sys; sys.stdout.buffer.write( b"\x90"*26 + b"\x48\x31\xd2\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53\x48\x89\xe7\x50\x57\x48\x89\xe6\xb0\x3b\x0f\x05" + b"\xc0\xdb\xff\xff\xff\xff\xff\x7f" * 2)' > ex.txt
 `
 
+Then, we can input this into our executable, and if all succeeds a shell should open.
+
+`ex.txt > ./foo`
+
+### Debugging
+
+There is a good chance that these instructions will not work out of the box on any given computer, because modern machines come with many settings enabled to prevent this type of attack. Many of these safeguards will shuffle stack addresses, meaning that what is seen in the debugger will be different from the addresses in the executable.
 
 
 
+Steve's example repo: https://github.com/syclops/buffer-overflow-examples
 
+One way to help with writing the raw bytes for your attack is to have a script write them for you and piping those results to your program. An example of this can be found in the buffer overflow example files [exploit.py](https://github.com/syclops/buffer-overflow-examples/blob/main/exploit.py).
 
+#### Stack moving around
+One thing that is put into Linux systems that makes them more secure is that your stack memory addresses will change every time you run a program. This makes it difficult to execute an attack when the addresses are an unknown.
 
+One thing that can help with this is setting the personality Linux variable, which sets a constant domain for the program to run in, preventing shifts. You can read more on the [man page](https://man7.org/linux/man-pages/man2/personality.2.html).
+`#include <sys/personality.h>
 
-<!-- python3 -c 'import sys; sys.stdout.write( "\x90"*10 + "\x48\x31\xd2\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53\x48\x89\xe7\x50\x57\x48\x89\xe6\xb0\x3b\x0f\x05" + "\xc4\x2f\x4c")' | ./foo -->
+int personality(2);`
 
+This can also be done at the system level, but it is not recommended, since it is easy to forget to reset it after running the attack.
 
-<!-- right function but wrong contents, has right shellcode -->
+![](images/stack_setting.png)
 
-Sabrina stack address : 7fff ffffd8a0
+It is also important to note that environment variables can change stack addresses, so it is important to keep them consistent between gdb and your command line. With a large enough buffer this may not always matter if you aim to return to the middle of the nops, since it doesn't shift the stack dramatically.
 
-\xff\x7f\x00\x00   \xa0\xd8\xff\xff
+One thing you may want to do is use the `unset` command in gdb as seen below to remove environment variables that gdb adds automatically so that you get more consistent results outside of the debugger.
 
-64 + 8 - 30 - 8 = 34
-64 + 4 - 30 - 8 = 32
-<!--
-python3 -c 'import sys; sys.stdout.buffer.write( b"\x90"*10 + b"\x48\x31\xd2\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53\x48\x89\xe7\x50\x57\x48\x89\xe6\xb0\x3b\x0f\x05" + b"\xc4\x2f\x4c")' > ex.txt -->
+![](images/unset.png)
 
+### Reflection
 
-
-
-
-<!--
-Submission Mechanics
-
-1) In your project report, you should already have a folder called "reports" that contains a Markdown document called "update.md".  Make a copy of "update.md" called "report.md"
-
-2) At the top of this document, give your report a title that at least suggests the topic of the project.  The title should not contain the name of the class or the words "project" or "report".
-
-3) List the complete names of all members of the team.
-
-4) Answer the questions in the Content section, above. Use typesetting features to indicate the organization of the document.  Do not include the questions as part of your document.
-
-5) Complete your update, view it on GitHub, and copy the GitHub URL.  Then paste the URL in the submission space below.  You only need one report for each team, but everyone should submit it. -->
+When we chose this project, we expected it to be very simple. Understanding buffer overflow attacks only took a day or so, but this project took weeks to complete. Most of our time was spent on debugging, and that process ended up teaching us about many other aspects of Linux and general operating systems- from assembly code, to environment variables, to common configurable security settings. We joked in our final meeting that this project was not so much about understanding and implementing buffer overflow techniques as understanding the inner workings of computer memory. More than anything this project was a reminder of the complexity of simple programs under the hood. We definitely achieved our learning goals, and then proceeded to learn about many things we didn't even know we didn't know.
